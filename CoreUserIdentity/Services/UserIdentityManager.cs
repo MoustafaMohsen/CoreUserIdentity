@@ -1,7 +1,5 @@
-﻿using CoreUserIdentity._UserIdentity.Dto;
-using CoreUserIdentity.Helpers;
+﻿using CoreUserIdentity.Helpers;
 using CoreUserIdentity.Models;
-using CoreUserIdentity.Models._UserIdentity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using MLiberary;
