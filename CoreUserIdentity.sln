@@ -5,6 +5,10 @@ VisualStudioVersion = 15.0.27130.2026
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CoreUserIdentity", "CoreUserIdentity\CoreUserIdentity.csproj", "{C7B6C4F8-566D-4D24-9285-404D30A427DA}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "VerficationEmailSender", "..\VerficationEmailSender\VerficationEmailSender\VerficationEmailSender.csproj", "{90BC104C-4F1E-4438-A214-E719C1DE6455}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MLiberary", "..\MLiberary\MLiberary\MLiberary.csproj", "{1BFC447F-6CF3-4C26-BE87-F4BB2E8EA319}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +19,14 @@ Global
 		{C7B6C4F8-566D-4D24-9285-404D30A427DA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C7B6C4F8-566D-4D24-9285-404D30A427DA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C7B6C4F8-566D-4D24-9285-404D30A427DA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{90BC104C-4F1E-4438-A214-E719C1DE6455}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{90BC104C-4F1E-4438-A214-E719C1DE6455}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{90BC104C-4F1E-4438-A214-E719C1DE6455}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{90BC104C-4F1E-4438-A214-E719C1DE6455}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1BFC447F-6CF3-4C26-BE87-F4BB2E8EA319}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1BFC447F-6CF3-4C26-BE87-F4BB2E8EA319}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1BFC447F-6CF3-4C26-BE87-F4BB2E8EA319}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1BFC447F-6CF3-4C26-BE87-F4BB2E8EA319}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
