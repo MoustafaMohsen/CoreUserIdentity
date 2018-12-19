@@ -907,12 +907,12 @@ namespace CoreUserIdentity._UserIdentity
 
             try
             {
-                EmailSettings emailSettings = new EmailSettings {
-                    ToName= ToName,
-                    ToEmail = ToEmail,
-                    ButtonUrl = ConfermationUrl
-                };
+                EmailSettings emailSettings = new EmailSettings();
                 emailSettings = userAppSettings.emailSettings;
+                emailSettings.ToName = ToName;
+                emailSettings.ToEmail = ToEmail;
+                emailSettings.ButtonUrl = ConfermationUrl;
+                
                 results = await verificationEmail.SendUserVerificationEmailAsync(emailSettings);
             }
             catch (Exception ex)
