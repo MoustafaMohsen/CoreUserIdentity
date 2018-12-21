@@ -309,6 +309,11 @@ namespace CoreUserIdentity._UserIdentity
                 {
                     userRole = userIdentity.EmailConfirmed ? MyRoles.client : MyRoles.unverfied;
                 }
+                // if email confirmation is disabled
+                if (userAppSettings.serviceIdentitySettings.UseEmailConfirmation == false)
+                {
+                    confirmEmail = true;
+                }
                 if (confirmEmail)
                 {
                     var emailVerificationCode = await mUserManager.GenerateEmailConfirmationTokenAsync(userIdentity);

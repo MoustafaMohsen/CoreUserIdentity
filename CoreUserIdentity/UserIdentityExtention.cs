@@ -27,6 +27,10 @@ namespace CoreUserIdentity._UserIdentity
             // Setup configuration
             services.Configure(setupAction);
 
+
+            //============================================================
+            // TODO: add if statment to see if email confirmation is enabled, remember to remove email sender injection
+            //============================================================
             // Add my email service
             services.AddVerficationEmailSender();
 
