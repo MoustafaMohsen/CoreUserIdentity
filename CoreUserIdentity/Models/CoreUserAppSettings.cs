@@ -32,12 +32,21 @@ namespace CoreUserIdentity.Models
         {
             public bool UseEmailConfirmation { get; set; } = true;
         }
+
+        public class ExternalLoginCredential
+        {
+            public string client_id { get; set; }
+            public string client_secret { get; set; }
+        }
         public SendGridAppSettings sendGrid { get; set; }
         public JwtAppSettings jwt { get; set; }
         public EmailSettings emailSettings { get; set; }
         public AdminInfo adminInfo { get; set; }
         public string apphost { get; set; }
         public string appVerPath { get; set; }
+
+        public ExternalLoginCredential facebookapp { get; set; }
+        public ExternalLoginCredential googleapp { get; set; }
 
         public ServiceIdentitySettings serviceIdentitySettings { get; set; }
     }

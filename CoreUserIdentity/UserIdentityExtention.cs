@@ -1,6 +1,7 @@
 ﻿using CoreUserIdentity.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
@@ -16,9 +17,9 @@ namespace CoreUserIdentity._UserIdentity
             this IServiceCollection services,
             Action<CoreUserAppSettings> setupAction
             ,string jwtkey, string audience, string issuer
-            ) 
-            where TContext : DbContext 
-            where ApplicationUser : MyIdentityUser , new()
+            )
+            where ApplicationUser : MyIdentityUser, new()
+            where TContext : IdentityDbContext<ApplicationUser>
         {
             // Checking Parameters validity
             if (setupAction == null) throw new ArgumentNullException(nameof(setupAction));
@@ -32,9 +33,11 @@ namespace CoreUserIdentity._UserIdentity
             // TODO: add if statment to see if email confirmation is enabled, remember to remove email sender injection
             //============================================================
             // Add my email service
-            services.AddVerficationEmailSender();
 
-            services.AddScoped< IUserIdentityManager<ApplicationUser>, UserIdentityManager<ApplicationUser> >();
+            services.AddVerficationEmailSender();
+            services.AddScoped<IExternalUserIdentityManager<ApplicationUser, TContext>, ExternalUserIdentityManager<ApplicationUser, TContext>>();
+
+            services.AddScoped<IUserIdentityManager<ApplicationUser, TContext>, UserIdentityManager<ApplicationUser, TContext>>();
 
             services.AddIdentity<ApplicationUser, IdentityRole>(
                 a =>
