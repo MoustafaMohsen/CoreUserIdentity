@@ -47,12 +47,15 @@ namespace CoreUserIdentity._UserIdentity
             ).AddEntityFrameworkStores<TContext>().AddDefaultTokenProviders();
 
             var key = Encoding.UTF8.GetBytes(jwtkey);
-            services.AddAuthentication(x =>
-            {
-                x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-            })
-                .AddJwtBearer(options => {
+
+            services
+                .AddAuthentication(x =>
+                {
+                    x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                    x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                })
+                .AddJwtBearer(options =>
+                {
                     options.TokenValidationParameters = new TokenValidationParameters
                     {
                         ValidateIssuer = true,
@@ -63,7 +66,10 @@ namespace CoreUserIdentity._UserIdentity
                         ValidAudience = audience,
                         IssuerSigningKey = new SymmetricSecurityKey(key)
                     };
-                });
+                })
+                ;
+                
+
 
             services.Configure<IdentityOptions>(options =>
             {
