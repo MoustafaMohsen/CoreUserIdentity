@@ -15,6 +15,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="CoreUserIdentity.2.0.0.nupkg" />
+    <None Remove="CoreUserIdentity.nuspec" />
+    <None Remove="CreateNugetPackage.ps1" />
+    <None Remove="nuget.exe" />
+    <None Remove="Start-Feature.ps1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="2.1.1" />
     <PackageReference Include="Microsoft.AspNetCore.Authorization" Version="2.1.1" />
     <PackageReference Include="Microsoft.AspNetCore.Identity" Version="2.1.1" />
