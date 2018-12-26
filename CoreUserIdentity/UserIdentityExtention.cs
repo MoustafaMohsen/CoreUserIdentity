@@ -1,6 +1,7 @@
 ﻿using CoreUserIdentity.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
@@ -16,9 +17,9 @@ namespace CoreUserIdentity._UserIdentity
             this IServiceCollection services,
             Action<CoreUserAppSettings> setupAction
             ,string jwtkey, string audience, string issuer
-            ) 
-            where TContext : DbContext 
-            where ApplicationUser : MyIdentityUser , new()
+            )
+            where ApplicationUser : MyIdentityUser, new()
+            where TContext : IdentityDbContext<ApplicationUser>
         {
             // Checking Parameters validity
             if (setupAction == null) throw new ArgumentNullException(nameof(setupAction));
@@ -27,10 +28,16 @@ namespace CoreUserIdentity._UserIdentity
             // Setup configuration
             services.Configure(setupAction);
 
-            // Add my email service
-            services.AddVerficationEmailSender();
 
-            services.AddScoped< IUserIdentityManager<ApplicationUser>, UserIdentityManager<ApplicationUser> >();
+            //============================================================
+            // TODO: add if statment to see if email confirmation is enabled, remember to remove email sender injection
+            //============================================================
+            // Add my email service
+
+            services.AddVerficationEmailSender();
+            services.AddScoped<IExternalUserIdentityManager<ApplicationUser, TContext>, ExternalUserIdentityManager<ApplicationUser, TContext>>();
+
+            services.AddScoped<IUserIdentityManager<ApplicationUser, TContext>, UserIdentityManager<ApplicationUser, TContext>>();
 
             services.AddIdentity<ApplicationUser, IdentityRole>(
                 a =>
@@ -43,12 +50,15 @@ namespace CoreUserIdentity._UserIdentity
             ).AddEntityFrameworkStores<TContext>().AddDefaultTokenProviders();
 
             var key = Encoding.UTF8.GetBytes(jwtkey);
-            services.AddAuthentication(x =>
-            {
-                x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-            })
-                .AddJwtBearer(options => {
+
+            services
+                .AddAuthentication(x =>
+                {
+                    x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                    x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                })
+                .AddJwtBearer(options =>
+                {
                     options.TokenValidationParameters = new TokenValidationParameters
                     {
                         ValidateIssuer = true,
@@ -59,7 +69,10 @@ namespace CoreUserIdentity._UserIdentity
                         ValidAudience = audience,
                         IssuerSigningKey = new SymmetricSecurityKey(key)
                     };
-                });
+                })
+                ;
+                
+
 
             services.Configure<IdentityOptions>(options =>
             {

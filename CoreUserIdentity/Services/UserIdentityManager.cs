@@ -1,6 +1,8 @@
 ﻿using CoreUserIdentity.Helpers;
 using CoreUserIdentity.Models;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MLiberary;
 using System;
@@ -16,7 +18,7 @@ using VerficationEmailSender.SendGrid;
 
 namespace CoreUserIdentity._UserIdentity
 {
-    public interface IUserIdentityManager<ApplicationUser>
+    public interface IUserIdentityManager<ApplicationUser, TDbContext>
     {
         #region Interfaces
 
@@ -26,14 +28,28 @@ namespace CoreUserIdentity._UserIdentity
         /// <param name="registerCredentials">The registration details</param>
         /// <param name="host">The Domain Host, Required to generate the user Verfication Url</param>
         /// <returns>Returns the result of the register request</returns>
-        Task<ApplicationUser> RegisterAsync(_IdentityUserDto registerCredentials, string host, string urlpath, bool sendEmail=true,string role="", bool confirmEmail = false);
+        Task<ApplicationUser> RegisterAsync(_IdentityUserDto registerCredentials, string host, string urlpath, bool sendEmail = true, string role = "", bool confirmEmail = false);
 
+        /// <summary>
+        /// Register user user user template, default role is client
+        /// </summary>
+        /// <param name="Newuser"></param>
+        /// <param name="role"></param>
+        /// <returns></returns>
+        Task<ApplicationUser> StrongRegisterAsync(ApplicationUser Newuser, string role = "");
 
         /// <summary>
         /// Logs in a user using token-based authentication
         /// </summary>
         /// <returns>Returns the result of the login request</returns>
         Task<_IdentityUserDto> LogInAsync(LoginUserDto loginCredentials);
+
+        /// <summary>
+        /// Login without password
+        /// </summary>
+        /// <param name="usernameOrEmail">username or password</param>
+        /// <returns></returns>
+        Task<_IdentityUserDto> LogInWithoutPassword(string usernameOrEmail);
 
         /// <summary>
         /// Verfiy User's Email
@@ -50,7 +66,7 @@ namespace CoreUserIdentity._UserIdentity
         /// <param name="host">the host domain</param>
         /// <param name="force">Send email verfication even if email already confirmed</param>
         /// <returns></returns>
-        Task<SendEmailResponse> sendEmailVerfication(string userId, string host, string urlpath, bool force=false);
+        Task<SendEmailResponse> sendEmailVerfication(string userId, string host, string urlpath, bool force = false);
 
         /// <summary>
         /// Get user object by id
@@ -65,6 +81,13 @@ namespace CoreUserIdentity._UserIdentity
         /// <param name="userId">the user id</</param>
         /// <returns></returns>
         Task<_IdentityUserDto> GetUserById_includeRoleAsync(string userId);
+
+        /// <summary>
+        /// Get user, Include External logins
+        /// </summary>
+        /// <param name="userId">the user id</param>
+        /// <returns></returns>
+        Task<ApplicationUser> GetUser_IncludeExternalLogins(string userId);
 
         /// <summary>
         /// Get NameIdentifier Claim from list of claims 
@@ -164,6 +187,21 @@ namespace CoreUserIdentity._UserIdentity
         Task<bool> IsEmailUnique(string Email);
 
         /// <summary>
+        /// Get User by Email
+        /// </summary>
+        /// <param name="email">user email</param>
+        /// <returns></returns>
+        Task<ApplicationUser> GetUserByEmail(string email);
+
+        /// <summary>
+        /// Get user by username
+        /// </summary>
+        /// <param name="username">username</param>
+        /// <returns></returns>
+        Task<ApplicationUser> GetUserByUsername(string username);
+
+
+        /// <summary>
         /// Is username unique, never taken before
         /// </summary>
         /// <param name="Email">the checked username</param>
@@ -192,6 +230,13 @@ namespace CoreUserIdentity._UserIdentity
         /// <param name="editUserDto">the edit user dto</param>
         /// <returns></returns>
         Task<ApplicationUser> UpdateInfoAsync(_IdentityUserDto editUserDto, bool requirePassword = true);
+
+        /// <summary>
+        /// Update Entity Info
+        /// </summary>
+        /// <param name="editUserDto">the updated user</param>
+        /// <returns></returns>
+        Task<ApplicationUser> StrongUpdateAsync(ApplicationUser editUserDto);
 
         /// <summary>
         /// Update user password
@@ -233,23 +278,27 @@ namespace CoreUserIdentity._UserIdentity
         IQueryable<ApplicationUser> GetAllUsersAsync();
         #endregion
     }
-    public class UserIdentityManager<ApplicationUser> : IUserIdentityManager<ApplicationUser>
+    public class UserIdentityManager<ApplicationUser, TDbContext> : IUserIdentityManager<ApplicationUser, TDbContext>
         where ApplicationUser : MyIdentityUser, new()
+        where TDbContext : IdentityDbContext<ApplicationUser>
     {
+        #region Class
         #region Protected Members
         protected CoreUserAppSettings userAppSettings;
         protected UserManager<ApplicationUser> mUserManager;
         protected SignInManager<ApplicationUser> mSignInManager;
         protected IVerificationEmail verificationEmail;
         protected RoleManager<IdentityRole> roleManager;
+        protected TDbContext db;
         #endregion
         #region Constructor
         public UserIdentityManager(
             IOptions<CoreUserAppSettings> _options,
-            UserManager<ApplicationUser> _mUserManager, 
+            UserManager<ApplicationUser> _mUserManager,
             SignInManager<ApplicationUser> _mSignInManager
             , IVerificationEmail _verification,
-            RoleManager<IdentityRole> _roleManager
+            RoleManager<IdentityRole> _roleManager,
+            TDbContext _db
             )
         {
             mUserManager = _mUserManager;
@@ -257,13 +306,14 @@ namespace CoreUserIdentity._UserIdentity
             userAppSettings = _options.Value;
             verificationEmail = _verification;
             roleManager = _roleManager;
+            db = _db;
         }
         #endregion
 
 
         #region User Login and Registration and authentication Methods
         public async Task<ApplicationUser> RegisterAsync
-            (_IdentityUserDto registerCredentials, string host,string urlpath, bool sendEmail = true, string role = "",bool confirmEmail=false)
+            (_IdentityUserDto registerCredentials, string host, string urlpath, bool sendEmail = true, string role = "", bool confirmEmail = false)
         {
             // Make sure we have a user name
             if (registerCredentials == null ||
@@ -296,7 +346,7 @@ namespace CoreUserIdentity._UserIdentity
                     Debugger.Break();
                 throw ex;
             }
-            
+
 
             // If the registration was successful...
             if (result.Succeeded)
@@ -309,6 +359,11 @@ namespace CoreUserIdentity._UserIdentity
                 {
                     userRole = userIdentity.EmailConfirmed ? MyRoles.client : MyRoles.unverfied;
                 }
+                // if email confirmation is disabled
+                if (userAppSettings.serviceIdentitySettings.UseEmailConfirmation == false)
+                {
+                    confirmEmail = true;
+                }
                 if (confirmEmail)
                 {
                     var emailVerificationCode = await mUserManager.GenerateEmailConfirmationTokenAsync(userIdentity);
@@ -316,7 +371,7 @@ namespace CoreUserIdentity._UserIdentity
                 }
                 else
                 {
-                    if (userIdentity.EmailConfirmed == false&& sendEmail )
+                    if (userIdentity.EmailConfirmed == false && sendEmail)
                     {
                         try
                         {
@@ -355,6 +410,59 @@ namespace CoreUserIdentity._UserIdentity
                         .Select(f => f.Description)
                         .Aggregate((a, b) => $"{a}{Environment.NewLine}{b}"));
         }
+
+        public async Task<ApplicationUser> StrongRegisterAsync(ApplicationUser Newuser, string role = "")
+        {
+            // Try and create a user
+            IdentityResult result;
+            try
+            {
+                result = await mUserManager.CreateAsync(Newuser);
+            }
+            catch (Exception ex)
+            {
+                if (Debugger.IsAttached)
+                    Debugger.Break();
+                throw ex;
+            }
+
+
+            // If the registration was successful add role
+            if (result.Succeeded)
+            {
+                var userIdentity = await mUserManager.FindByNameAsync(Newuser.UserName);
+                string userRole = role;
+                if (string.IsNullOrEmpty(role))
+                {
+                    userRole = MyRoles.client;
+                }
+                try
+                {
+                    await mUserManager.AddToRoleAsync(userIdentity, userRole);
+                }
+                catch (Exception ex)
+                {
+
+                    throw ex;
+                }
+
+
+
+                // Return valid response containing all users details
+                return userIdentity;
+            }
+            // Otherwise if it failed...
+            else
+            // Return the failed response
+            // Aggregate all errors into a single error string
+            if (Debugger.IsAttached)
+                Debugger.Break();
+
+            throw new CoreUserAppException(result.Errors?.ToList()
+                        .Select(f => f.Description)
+                        .Aggregate((a, b) => $"{a}{Environment.NewLine}{b}"));
+        }
+
         public async Task<_IdentityUserDto> LogInAsync(LoginUserDto loginCredentials)
         {
             // Make sure we have a user name
@@ -364,7 +472,7 @@ namespace CoreUserIdentity._UserIdentity
 
 
             // Is it an email?
-            var isEmail = loginCredentials.usernameOrEmail.Contains("@");
+            var isEmail = GeneralMethods.IsEmail(loginCredentials.usernameOrEmail);
 
             // Get the user details
             var user = isEmail ?
@@ -397,23 +505,62 @@ namespace CoreUserIdentity._UserIdentity
             // Return token to user
             return new _IdentityUserDto
             {
-                    Id= user.Id,
-                    FirstName = user.FirstName,
-                    LastName = user.LastName,
-                    Email = user.Email,
-                    role = GetBiggestRole(role),
-                    UserName = user.UserName,
-                    token = JwtToken.GenerateJwtToken(user, role.ToList(), userAppSettings)
+                Id = user.Id,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Email = user.Email,
+                role = GetBiggestRole(role),
+                UserName = user.UserName,
+                token = JwtToken.GenerateJwtToken(user, role.ToList(), userAppSettings)
             };
         }
-        public async Task<string> GenerateTokenAsync(string userId,int ExperationInDayes=90)
+
+        public async Task<_IdentityUserDto> LogInWithoutPassword(string usernameOrEmail)
+        {
+            // Make sure we have a user name
+            if (string.IsNullOrWhiteSpace(usernameOrEmail))
+                // Return error message to user
+                throw new CoreUserAppException("Invalid Input");
+
+
+            // Is it an email?
+            var isEmail = GeneralMethods.IsEmail(usernameOrEmail);
+
+            // Get the user details
+            var user = isEmail ?
+                // Find by email
+                await mUserManager.FindByEmailAsync(usernameOrEmail) :
+                // Find by username
+                await mUserManager.FindByNameAsync(usernameOrEmail);
+
+            // If we failed to find a user...
+            if (user == null)
+                // Return error message to user
+                throw new CoreUserAppException("User Not Found");
+
+            // Get username
+            var role = await GetUserRoles(user);
+            // Return token to user
+            return new _IdentityUserDto
+            {
+                Id = user.Id,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Email = user.Email,
+                role = GetBiggestRole(role),
+                UserName = user.UserName,
+                token = JwtToken.GenerateJwtToken(user, role.ToList(), userAppSettings)
+            };
+        }
+
+        public async Task<string> GenerateTokenAsync(string userId, int ExperationInDayes = 90)
         {
             try
             {
                 var user = await GetUserById(userId);
-                if (user!=null)
+                if (user != null)
                 {
-                    var roles =await GetUserRoles(user);
+                    var roles = await GetUserRoles(user);
                     return JwtToken.GenerateJwtToken(user, roles, userAppSettings, ExperationInDayes);
                 }
                 throw new CoreUserAppException("User not found");
@@ -439,13 +586,24 @@ namespace CoreUserIdentity._UserIdentity
                 throw new CoreUserAppException("Operation not succeful");
             }
         }
+
         #endregion
 
         #region User Helpers
-        public async Task<bool> CheckPasswordAsync(string UserId,string Password)
+        public async Task<ApplicationUser> GetUser_IncludeExternalLogins(string userId)
         {
-            var user =await GetUserById(UserId);
-            if(user!=null)
+            var user = await db.Users
+                .Where(x => x.Id == userId)
+                .Include(x => x.ExternalLogin)
+                .ThenInclude(x => x.OtherUserInfo)
+                .FirstOrDefaultAsync();
+
+            return user;
+        }
+        public async Task<bool> CheckPasswordAsync(string UserId, string Password)
+        {
+            var user = await GetUserById(UserId);
+            if (user != null)
                 return await mUserManager.CheckPasswordAsync(user, Password);
             return false;
         }
@@ -458,10 +616,10 @@ namespace CoreUserIdentity._UserIdentity
         public async Task<bool> IsEmailUnique(string Email)
         {
             {
-                Email=Email.ToUpper();
+                Email = Email.ToUpper();
                 try
                 {
-                    var user= await mUserManager.FindByEmailAsync(Email);
+                    var user = await mUserManager.FindByEmailAsync(Email);
                     if (user != null)
                     {
                         return true;
@@ -493,8 +651,7 @@ namespace CoreUserIdentity._UserIdentity
                 return false;
             }
         }
-
-        public async Task<_IdentityUserDto> ApplicationUser_ToUserDto(ApplicationUser userIdentity,string userRole)
+        public async Task<_IdentityUserDto> ApplicationUser_ToUserDto(ApplicationUser userIdentity, string userRole)
         {
             return new _IdentityUserDto
             {
@@ -507,7 +664,6 @@ namespace CoreUserIdentity._UserIdentity
                 role = userRole
             };
         }
-
         public async Task<_IdentityUserDto> ApplicationUser_ToUserDto(ApplicationUser userIdentity, List<string> userRoles)
         {
             var role = GetBiggestRole(userRoles);
@@ -518,7 +674,7 @@ namespace CoreUserIdentity._UserIdentity
                 LastName = userIdentity.LastName,
                 Email = userIdentity.Email,
                 UserName = userIdentity.UserName,
-                token = JwtToken.GenerateJwtToken(userIdentity, userRoles , userAppSettings),
+                token = JwtToken.GenerateJwtToken(userIdentity, userRoles, userAppSettings),
                 role = role
             };
         }
@@ -526,7 +682,7 @@ namespace CoreUserIdentity._UserIdentity
 
         #region User Update
         // thrower
-        public async Task<ApplicationUser> UpdateInfoAsync(_IdentityUserDto editUserDto,bool requirePassword = true)
+        public async Task<ApplicationUser> UpdateInfoAsync(_IdentityUserDto editUserDto, bool requirePassword = true)
         {
             var IdeneityUser = await GetUserById(editUserDto.Id);
 
@@ -537,26 +693,26 @@ namespace CoreUserIdentity._UserIdentity
             //Check password
             if (requirePassword)
             {
-            var PasswordCorrect = await mUserManager.CheckPasswordAsync(IdeneityUser, editUserDto.password);
+                var PasswordCorrect = await mUserManager.CheckPasswordAsync(IdeneityUser, editUserDto.password);
 
-            if (PasswordCorrect == false)
-                throw new CoreUserAppException("Password is Incorrect");
+                if (PasswordCorrect == false)
+                    throw new CoreUserAppException("Password is Incorrect");
             }
 
 
             // UpdateUsername
             IdeneityUser.FirstName = UpdateInput(IdeneityUser.FirstName, editUserDto.FirstName);
             IdeneityUser.LastName = UpdateInput(IdeneityUser.LastName, editUserDto.LastName);
-            if(ValueChanged(IdeneityUser.Email, editUserDto.Email))
-                if(await IsEmailUnique(editUserDto.Email))
+            if (ValueChanged(IdeneityUser.Email, editUserDto.Email))
+                if (await IsEmailUnique(editUserDto.Email))
                     IdeneityUser.Email = UpdateInput(IdeneityUser.Email, editUserDto.Email);
 
             try
             {
-                var result =await  mUserManager.UpdateAsync(IdeneityUser);
+                var result = await mUserManager.UpdateAsync(IdeneityUser);
                 if (result.Succeeded)
                 {
-                    var returnIdentityUser =await GetUserById(IdeneityUser.Id);
+                    var returnIdentityUser = await GetUserById(IdeneityUser.Id);
                     return returnIdentityUser;
                 }
                 throw new CoreUserAppException("Operation not Succesfull");
@@ -568,18 +724,42 @@ namespace CoreUserIdentity._UserIdentity
 
 
         }
+        public async Task<ApplicationUser> StrongUpdateAsync(ApplicationUser editUserDto)
+        {
+            var IdeneityUser = await GetUserById(editUserDto.Id);
+
+            // Make sure we have a user name
+            if (IdeneityUser == null)
+                // Return error message to user
+                throw new CoreUserAppException("User not found");
+
+            try
+            {
+                var result = await mUserManager.UpdateAsync(IdeneityUser);
+                if (result.Succeeded)
+                {
+                    var returnIdentityUser = await GetUserById(IdeneityUser.Id);
+                    return returnIdentityUser;
+                }
+                throw new CoreUserAppException("Operation not Succesfull");
+            }
+            catch (Exception ex)
+            {
+                throw new CoreUserAppException(ex.Message);
+            }
+        }
         // thrower
-        public async Task<ApplicationUser> UpdatePasswordAsync(string userId,string oldPassword,string newPassword)
+        public async Task<ApplicationUser> UpdatePasswordAsync(string userId, string oldPassword, string newPassword)
         {
             if (ValueChanged(oldPassword, newPassword))
             {
                 var user = await GetUserById(userId);
-                if (user!=null)
+                if (user != null)
                 {
                     var PasswordCorrect = await CheckPasswordAsync(user.Id, oldPassword);
                     if (PasswordCorrect)
                     {
-                        var result = await mUserManager.ChangePasswordAsync(user,oldPassword,newPassword);
+                        var result = await mUserManager.ChangePasswordAsync(user, oldPassword, newPassword);
                         if (result.Succeeded)
                         {
                             return await GetUserById(user.Id);
@@ -602,8 +782,8 @@ namespace CoreUserIdentity._UserIdentity
         // thrower
         public async Task<bool> DeleteUserAsync(string userId, string Password)
         {
-            var user =await GetUserById(userId);
-            if (user!=null)
+            var user = await GetUserById(userId);
+            if (user != null)
             {
                 //check password
                 var PasswordCorrect = await CheckPasswordAsync(user, Password);
@@ -638,13 +818,13 @@ namespace CoreUserIdentity._UserIdentity
             }
             return false;
         }
-        public string UpdateInput(string OldValue,string NewValue)
+        public string UpdateInput(string OldValue, string NewValue)
         {
             if (String.IsNullOrWhiteSpace(NewValue))
             {
                 return OldValue;
             }
-            if ( ValueChanged(OldValue,NewValue) )
+            if (ValueChanged(OldValue, NewValue))
             {
                 return NewValue;
             }
@@ -712,16 +892,16 @@ namespace CoreUserIdentity._UserIdentity
             var results = await mUserManager.IsInRoleAsync(user, role);
             return results;
         }
-        public async Task<bool> AddRoleToUser(ApplicationUser user, string roleName,bool AutoCreate =false)
+        public async Task<bool> AddRoleToUser(ApplicationUser user, string roleName, bool AutoCreate = false)
         {
             var hasRole = await UserHasRole(user, roleName);
             // if user doesn't has the role
-            if (hasRole==false)
+            if (hasRole == false)
             {
                 //if role exsist
                 if (await RoleExsists(roleName))
                 {
-                    var res=await mUserManager.AddToRoleAsync(user, roleName);
+                    var res = await mUserManager.AddToRoleAsync(user, roleName);
                     return res.Succeeded;
                 }
                 //if role doesn't exsist
@@ -731,7 +911,7 @@ namespace CoreUserIdentity._UserIdentity
                     if (AutoCreate)
                     {
                         await _CreateRole(roleName);
-                        var res =await mUserManager.AddToRoleAsync(user, roleName);
+                        var res = await mUserManager.AddToRoleAsync(user, roleName);
                         return res.Succeeded;
                     }
                     // if auto create is false
@@ -772,7 +952,7 @@ namespace CoreUserIdentity._UserIdentity
         {
             var UserRoles = await GetUserRoles(user);
             // if user has the role
-            if (UserRoles.Count>0)
+            if (UserRoles.Count > 0)
             {
                 var res = await mUserManager.RemoveFromRolesAsync(user, UserRoles);
                 return res.Succeeded;
@@ -783,11 +963,10 @@ namespace CoreUserIdentity._UserIdentity
                 return true;
             }
         }
-
         #endregion
 
         #region Email Verfication Methods
-        public async Task<SendEmailResponse> sendEmailVerfication(string userId, string host,string urlpath, bool force=false)
+        public async Task<SendEmailResponse> sendEmailVerfication(string userId, string host, string urlpath, bool force = false)
         {
             var user = await GetUserById(userId);
             if (user == null)
@@ -796,7 +975,7 @@ namespace CoreUserIdentity._UserIdentity
             SendEmailResponse results = null;
             try
             {
-                results = await sendVerfication(user,  host, urlpath, force);
+                results = await sendVerfication(user, host, urlpath, force);
             }
             catch (CoreUserAppException ex)
             {
@@ -841,12 +1020,22 @@ namespace CoreUserIdentity._UserIdentity
             var user = await mUserManager.FindByIdAsync(userId);
             return user;
         }
+        public async Task<ApplicationUser> GetUserByUsername(string username)
+        {
+            var user = await mUserManager.FindByNameAsync(username);
+            return user;
+        }
+        public async Task<ApplicationUser> GetUserByEmail(string email)
+        {
+            var user = await mUserManager.FindByEmailAsync(email);
+            return user;
+        }
         public async Task<_IdentityUserDto> GetUserById_includeRoleAsync(string userId)
         {
             var user = await mUserManager.FindByIdAsync(userId);
             var role = await GetUserRoles(user);
             // Return token to user
-            var userDto=new  _IdentityUserDto
+            var userDto = new _IdentityUserDto
             {
                 Id = user.Id,
                 FirstName = user.FirstName,
@@ -879,14 +1068,13 @@ namespace CoreUserIdentity._UserIdentity
         }
         #endregion
 
-
         #region private Methods
         private string CreateUrlFromCode(string host, string urlpath, string VerficationCode, string userid)
         {
             var url = $"{host}{urlpath}?Id={HttpUtility.UrlEncode(userid)}&verCode={HttpUtility.UrlEncode(VerficationCode)}";
             return url;
         }
-        private async Task<SendEmailResponse> sendVerfication(ApplicationUser user, string host,string urlpath, bool force=false)
+        private async Task<SendEmailResponse> sendVerfication(ApplicationUser user, string host, string urlpath, bool force = false)
         {
             if (user == null)
                 throw new CoreUserAppException("Empty User,Please contact site adminstrator");
@@ -903,7 +1091,7 @@ namespace CoreUserIdentity._UserIdentity
 
             var ToName = user.NormalizedUserName;
             var ToEmail = user.Email.ToLower();
-            var ConfermationUrl = CreateUrlFromCode(host,urlpath, emailVerificationCode, user.Id);
+            var ConfermationUrl = CreateUrlFromCode(host, urlpath, emailVerificationCode, user.Id);
 
             try
             {
@@ -912,7 +1100,7 @@ namespace CoreUserIdentity._UserIdentity
                 emailSettings.ToName = ToName;
                 emailSettings.ToEmail = ToEmail;
                 emailSettings.ButtonUrl = ConfermationUrl;
-                
+
                 results = await verificationEmail.SendUserVerificationEmailAsync(emailSettings);
             }
             catch (Exception ex)
@@ -941,7 +1129,6 @@ namespace CoreUserIdentity._UserIdentity
                 throw ex;
             }
         }
-
         private async Task<bool> RoleExsists(string roleName)
         {
             bool exsists;
@@ -956,7 +1143,6 @@ namespace CoreUserIdentity._UserIdentity
             }
             return exsists;
         }
-
         private async Task CreateDefaultRoles()
         {
             if (!await RoleExsists(MyRoles.admin))
@@ -1027,8 +1213,7 @@ namespace CoreUserIdentity._UserIdentity
         #endregion
         */
         #endregion
-        
 
-
+        #endregion
     }
 }
