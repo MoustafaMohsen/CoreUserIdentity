@@ -217,6 +217,13 @@ namespace CoreUserIdentity._UserIdentity
         Task<_IdentityUserDto> ApplicationUser_ToUserDto(ApplicationUser userIdentity, string userRole);
 
         /// <summary>
+        /// Convert User identity to User Dto, Handles role and token
+        /// </summary>
+        /// <param name="userIdentity"></param>
+        /// <returns></returns>
+        Task<_IdentityUserDto> ApplicationUser_ToUserDto(ApplicationUser userIdentity);
+
+        /// <summary>
         /// Converts Application user to UserDto object, adds roles
         /// </summary>
         /// <param name="userIdentity">the user object</param>
@@ -254,6 +261,13 @@ namespace CoreUserIdentity._UserIdentity
         /// <param name="Password">the user password</param>
         /// <returns></returns>
         Task<bool> DeleteUserAsync(string userId, string Password);
+
+        /// <summary>
+        /// Premnently delete user, no password needed
+        /// </summary>
+        /// <param name="userId">the full user object</param>
+        /// <returns></returns>
+        Task<bool> DeleteUserNoPasswordAsync(ApplicationUser applicationUser);
 
         /// <summary>
         /// Generate token using user id
@@ -651,6 +665,7 @@ namespace CoreUserIdentity._UserIdentity
                 return false;
             }
         }
+
         public async Task<_IdentityUserDto> ApplicationUser_ToUserDto(ApplicationUser userIdentity, string userRole)
         {
             return new _IdentityUserDto
@@ -662,6 +677,21 @@ namespace CoreUserIdentity._UserIdentity
                 UserName = userIdentity.UserName,
                 token = JwtToken.GenerateJwtToken(userIdentity, new List<string>() { userRole }, userAppSettings),
                 role = userRole
+            };
+        }
+
+        public async Task<_IdentityUserDto> ApplicationUser_ToUserDto(ApplicationUser userIdentity)
+        {
+            var role = await GetUserRole(userIdentity);
+            return new _IdentityUserDto
+            {
+                Id = userIdentity.Id,
+                FirstName = userIdentity.FirstName,
+                LastName = userIdentity.LastName,
+                Email = userIdentity.Email,
+                UserName = userIdentity.UserName,
+                token = JwtToken.GenerateJwtToken(userIdentity, new List<string>() { role }, userAppSettings),
+                role = role
             };
         }
         public async Task<_IdentityUserDto> ApplicationUser_ToUserDto(ApplicationUser userIdentity, List<string> userRoles)
@@ -782,6 +812,10 @@ namespace CoreUserIdentity._UserIdentity
         // thrower
         public async Task<bool> DeleteUserAsync(string userId, string Password)
         {
+            if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(Password))
+            {
+                throw new CoreUserAppException("Password Is Incorrect");
+            }
             var user = await GetUserById(userId);
             if (user != null)
             {
@@ -795,6 +829,31 @@ namespace CoreUserIdentity._UserIdentity
                 else
                 {
                     throw new CoreUserAppException("Password Is Incorrect");
+                }
+            }
+            throw new CoreUserAppException("User not found");
+        }
+        // thrower
+        public async Task<bool> DeleteUserNoPasswordAsync(ApplicationUser applicationUser)
+        {
+            if (M.isNull(applicationUser) )
+            {
+                throw new CoreUserAppException("No User Provided");
+            }
+            var user = await GetUserById(applicationUser.Id);
+            if (user != null)
+            {
+                try
+                {
+                    var results = await mUserManager.DeleteAsync(applicationUser);
+                    return results.Succeeded;
+                }
+                catch (Exception ex)
+                {
+                    if (Debugger.IsAttached)
+                        Debugger.Break();
+                    
+                    throw;
                 }
             }
             throw new CoreUserAppException("User not found");

@@ -1,14 +1,20 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace CoreUserIdentity.Models
 {
     public class MyIdentityUser : IdentityUser
     {
+        [MaxLength(length: 255)]
         public string FirstName { get; internal set; }
+
+        [MaxLength(length: 255)]
         public string LastName { get; internal set; }
+
+        [MaxLength(length: 2083)]
         public string PictureUrl { get; set; }
-        public byte PictureValue { get; set; }
+
         public ExternalLogin ExternalLogin { get; set; }
     }
 

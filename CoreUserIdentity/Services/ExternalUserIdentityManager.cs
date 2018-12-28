@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using CoreUserIdentity._UserIdentity.Models.Facebook;
 using CoreUserIdentity._UserIdentity.Models.Google;
 using CoreUserIdentity._UserIdentity.Models.OAuth;
+using CoreUserIdentity.Models.OAuth;
 
 namespace CoreUserIdentity._UserIdentity
 {
@@ -22,7 +23,7 @@ namespace CoreUserIdentity._UserIdentity
         Task UpdateExternalLoginInfo(ApplicationUser CheckUser, ExternalLogin externalLogin);
         Task<_IdentityUserDto> LoginWithProvider(string userId, string providername);
         Task<_IdentityUserDto> RegisterWithProvider(ExternalUserData userDataObj);
-        Task<_IdentityUserDto> LoginOrRegisterExternal(ExternalUserData userDataObj);
+        Task<RegisterLoginResults> LoginOrRegisterExternal(ExternalUserData userDataObj);
         #endregion
 
         #region Facebook OAuth flow
@@ -163,24 +164,49 @@ namespace CoreUserIdentity._UserIdentity
             }
         }
 
-        public async Task<_IdentityUserDto> LoginOrRegisterExternal(ExternalUserData userDataObj)
+        public async Task<RegisterLoginResults> LoginOrRegisterExternal(ExternalUserData userDataObj)
         {
             // Check if user Registered 
+            if (string.IsNullOrWhiteSpace(userDataObj.email))
+            {
+                RegisterLoginResults errorResults = new RegisterLoginResults()
+                {
+                    User = null,
+                    operation = "error",
+                    errors = "PLease Provide the email, Login failed",
+                    errorsDescription="Facebook didn't provide the email"
+                };
+                return errorResults;
+
+            }
             ApplicationUser CheckUser = await MyIdentityManager.GetUserByEmail(userDataObj.email);
             // if user already exsists
             if (!M.isNull(CheckUser))
             {
                 try
                 {
-                    var userDto = await LoginWithProvider(CheckUser.Id, userDataObj.providername);
-                    return userDto;
+                    _IdentityUserDto userDto = await LoginWithProvider(CheckUser.Id, userDataObj.providername);
+                    RegisterLoginResults loginResults = new RegisterLoginResults()
+                    {
+                        User = userDto,
+                        operation = "login",
+                        errors = null
+                    };
+                    return loginResults;
 
                 }
                 catch (Exception ex)
                 {
                     if (Debugger.IsAttached)
                         Debugger.Break();
-                    throw new CoreUserAppException("Email Already registered, please login with login info");
+                    RegisterLoginResults errorResults = new RegisterLoginResults()
+                    {
+                        User = null,
+                        operation = "login",
+                        errors = "Email Already registered, please login with login info",
+                        errorsDescription = ex.Message
+                    };
+                    return errorResults;
                 }
             }
             // if user is not registered
@@ -189,13 +215,26 @@ namespace CoreUserIdentity._UserIdentity
                 try
                 {
                     _IdentityUserDto RegisteredUserDto = await RegisterWithProvider(userDataObj);
-                    return RegisteredUserDto;
+                    RegisterLoginResults RegisterResults = new RegisterLoginResults()
+                    {
+                        User = RegisteredUserDto,
+                        operation = "register",
+                        errors = null
+                    };
+                    return RegisterResults;
                 }
                 catch (Exception ex)
                 {
                     if (Debugger.IsAttached)
                         Debugger.Break();
-                    throw new CoreUserAppException("Email registeration error, please contact support");
+                    RegisterLoginResults errorResults = new RegisterLoginResults()
+                    {
+                        User = null,
+                        errors = "Email registeration error, please contact support",
+                        operation = "register",
+                        errorsDescription = ex.Message
+                    };
+                    return errorResults;
                 }
             }
         }
