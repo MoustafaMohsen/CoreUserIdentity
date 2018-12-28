@@ -29,6 +29,14 @@
         /// </summary>
         public string Email { get; set; }
 
+        /// <summary>
+        /// The external provider if found
+        /// </summary>
+        public string externalProvider { get; set; }
+
+        /// <summary>
+        /// The user password
+        /// </summary>
         public string password { get; set; } = "";
 
         /// <summary>

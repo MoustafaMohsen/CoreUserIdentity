@@ -52,6 +52,29 @@ namespace CoreUserIdentity._UserIdentity
         Task<_IdentityUserDto> LogInWithoutPassword(string usernameOrEmail);
 
         /// <summary>
+        /// force reset password
+        /// </summary>
+        /// <param name="userId">the user id</param>
+        /// <param name="newPassword">the user password</param>
+        /// <returns></returns>
+        Task<ApplicationUser> UpdatePasswordForceAsync(string userId, string newPassword);
+
+        /// <summary>
+        /// Check external provider is correct
+        /// </summary>
+        /// <param name="userId"></param>
+        /// <param name="externalprovider"></param>
+        /// <returns></returns>
+        Task<bool> CheckExternalProvider(string userId, string externalprovider);
+
+        /// <summary>
+        /// Get user external logins
+        /// </summary>
+        /// <param name="userId"></param>
+        /// <returns></returns>
+        Task<ExternalLogin> GetExternalLoginAsync(string userId);
+
+        /// <summary>
         /// Verfiy User's Email
         /// </summary>
         /// <param name="userId">the user id</param>
@@ -81,6 +104,13 @@ namespace CoreUserIdentity._UserIdentity
         /// <param name="userId">the user id</</param>
         /// <returns></returns>
         Task<_IdentityUserDto> GetUserById_includeRoleAsync(string userId);
+
+        /// <summary>
+        /// Get User with roles and external logins
+        /// </summary>
+        /// <param name="userId">the user id</param>
+        /// <returns></returns>
+        Task<_IdentityUserDto> GetUserById_Roles_externalLogins(string userId);
 
         /// <summary>
         /// Get user, Include External logins
@@ -525,8 +555,20 @@ namespace CoreUserIdentity._UserIdentity
                 Email = user.Email,
                 role = GetBiggestRole(role),
                 UserName = user.UserName,
+                externalProvider = user.ExternalLogin?.LoginProviderName,
                 token = JwtToken.GenerateJwtToken(user, role.ToList(), userAppSettings)
             };
+        }
+
+        public async Task<ExternalLogin> GetExternalLoginAsync(string userId)
+        {
+            var user = await GetUser_IncludeExternalLogins(userId);
+            var externalLogin = user.ExternalLogin;
+            if (externalLogin==null)
+            {
+                externalLogin = new ExternalLogin();
+            }
+            return externalLogin;
         }
 
         public async Task<_IdentityUserDto> LogInWithoutPassword(string usernameOrEmail)
@@ -563,6 +605,7 @@ namespace CoreUserIdentity._UserIdentity
                 Email = user.Email,
                 role = GetBiggestRole(role),
                 UserName = user.UserName,
+                externalProvider = user.ExternalLogin?.LoginProviderName,
                 token = JwtToken.GenerateJwtToken(user, role.ToList(), userAppSettings)
             };
         }
@@ -584,6 +627,7 @@ namespace CoreUserIdentity._UserIdentity
                 throw new CoreUserAppException("Operation not succeful");
             }
         }
+
         public async Task<string> GenerateTokenAsync(ApplicationUser user, int ExperationInDayes = 90)
         {
             try
@@ -675,6 +719,7 @@ namespace CoreUserIdentity._UserIdentity
                 LastName = userIdentity.LastName,
                 Email = userIdentity.Email,
                 UserName = userIdentity.UserName,
+                externalProvider = userIdentity.ExternalLogin?.LoginProviderName,
                 token = JwtToken.GenerateJwtToken(userIdentity, new List<string>() { userRole }, userAppSettings),
                 role = userRole
             };
@@ -690,6 +735,7 @@ namespace CoreUserIdentity._UserIdentity
                 LastName = userIdentity.LastName,
                 Email = userIdentity.Email,
                 UserName = userIdentity.UserName,
+                externalProvider = userIdentity.ExternalLogin?.LoginProviderName,
                 token = JwtToken.GenerateJwtToken(userIdentity, new List<string>() { role }, userAppSettings),
                 role = role
             };
@@ -704,6 +750,7 @@ namespace CoreUserIdentity._UserIdentity
                 LastName = userIdentity.LastName,
                 Email = userIdentity.Email,
                 UserName = userIdentity.UserName,
+                externalProvider = userIdentity.ExternalLogin?.LoginProviderName,
                 token = JwtToken.GenerateJwtToken(userIdentity, userRoles, userAppSettings),
                 role = role
             };
@@ -808,6 +855,48 @@ namespace CoreUserIdentity._UserIdentity
             }
             else
                 throw new CoreUserAppException("oldPassoword and new password are the same");
+        }
+
+        public async Task<ApplicationUser> UpdatePasswordForceAsync(string userId, string newPassword)
+        {
+            var user = await GetUserById(userId);
+            if (user != null)
+            {
+                IdentityResult result;
+                try
+                {
+                    result = await ResetPassword(user,newPassword);
+                }
+                catch (Exception ex)
+                {
+                    throw new CoreUserAppException("Operation failed");
+                }
+
+                if (result.Succeeded)
+                {
+                    return await GetUserById(user.Id);
+                }
+                throw new CoreUserAppException("Operation failed");
+
+            }
+            else
+            {
+                throw new CoreUserAppException("User not Found");
+            }
+        }
+
+        public async Task<bool> CheckExternalProvider(string userId, string externalprovider)
+        {
+            var user = await GetUser_IncludeExternalLogins(userId);
+            var result =  user.ExternalLogin?.LoginProviderName?.ToLower() == externalprovider?.ToLower();
+            return result;
+        }
+
+        public async Task<IdentityResult> ResetPassword(ApplicationUser user,string newPassword)
+        {
+            var token = await mUserManager.GeneratePasswordResetTokenAsync(user);
+            var result = await mUserManager.ResetPasswordAsync(user, token, newPassword);
+            return result;
         }
         // thrower
         public async Task<bool> DeleteUserAsync(string userId, string Password)
@@ -1102,10 +1191,35 @@ namespace CoreUserIdentity._UserIdentity
                 Email = user.Email,
                 role = GetBiggestRole(role),
                 UserName = user.UserName,
+                externalProvider = user.ExternalLogin?.LoginProviderName,
                 token = JwtToken.GenerateJwtToken(user, role.ToList(), userAppSettings)
             };
             return userDto;
         }
+
+        public async Task<_IdentityUserDto> GetUserById_Roles_externalLogins(string userId)
+        {
+            var user = await GetUser_IncludeExternalLogins(userId);
+            if (user == null)
+            {
+                return null;
+            }
+            var role = await GetUserRoles(user);
+            // Return token to user
+            var userDto = new _IdentityUserDto
+            {
+                Id = user.Id,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Email = user.Email,
+                role = GetBiggestRole(role),
+                UserName = user.UserName,
+                externalProvider = user.ExternalLogin?.LoginProviderName,
+                token = JwtToken.GenerateJwtToken(user, role.ToList(), userAppSettings)
+            };
+            return userDto;
+        }
+
         public Claim FindClaim(IEnumerable<Claim> Eclaims, string ClaimType)
         {
             var claims = Eclaims.ToList();

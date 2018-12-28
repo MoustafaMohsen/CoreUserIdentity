@@ -3,7 +3,7 @@ using System.Globalization;
 
 namespace CoreUserIdentity.Helpers
 {
-    class CoreUserAppException : Exception
+    public class CoreUserAppException : Exception
     {
         public CoreUserAppException() : base() { }
         public CoreUserAppException(string message) : base(message) { }
