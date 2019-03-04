@@ -100,5 +100,47 @@ namespace CoreUserIdentity._UserIdentity
             // Return the generated token
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
-    }
+
+        //////////////////////
+        public static string CustomGenerateToken(string key,string issuer,string audience,double hours, Claim[] claims)
+        {
+            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
+            var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+            var secToken = new JwtSecurityToken(
+                signingCredentials: credentials,
+                issuer: issuer,
+                audience: audience,
+                claims: claims,
+                expires: DateTime.UtcNow.AddHours(hours)
+                );
+
+            var handler = new JwtSecurityTokenHandler();
+            return handler.WriteToken(secToken);
+        }
+
+        public static ClaimsPrincipal CustomValidateToken(string token, string key, string issuer, string audience)
+        {
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var validationParameters = GetValidationParameters(key, issuer, audience);
+
+            SecurityToken validatedToken;
+            var principal = tokenHandler.ValidateToken(token, validationParameters, out validatedToken);
+            return principal;
+        }
+
+        private static TokenValidationParameters GetValidationParameters(string key, string issuer, string audience)
+        {
+            return new TokenValidationParameters()
+            {
+                ValidateLifetime = true, // Because there is no expiration in the generated token
+                ValidateAudience = true, // Because there is no audiance in the generated token
+                ValidateIssuer = true,   // Because there is no issuer in the generated token
+                ValidIssuer = issuer,
+                ValidAudience = audience,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)) // The same key as the one that generate the token
+            };
+        }
+
+    }//class
 }

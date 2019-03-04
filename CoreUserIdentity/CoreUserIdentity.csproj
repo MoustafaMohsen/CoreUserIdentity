@@ -2,8 +2,17 @@
 
   <PropertyGroup>
     <TargetFramework>netcoreapp2.1</TargetFramework>
-    <Version>2.2.0</Version>
-    <Description>Core identity User extension</Description>
+    <Version>2.2.2</Version>
+    <Description>Core User Identity is a .NET Class library and  Package  ([Package page](https://www.nuget.org/packages/MLiberary/))  that helps in the implementation of ASP .NET Identity
+
+To put it simply, you can use Core User Identity to Implement:
+
+- Helper service to handle login, register, update, delete, roles and other functionalities
+- JWT tokens authentication, JWT tokens reader
+- Controller attributes for authentication with roles
+- OAuth2 Login with Facebook or Google
+- User Roles management Service to add, remove or update user Roles
+- Sending Email verification with VerficationEmailSender Package</Description>
     <Copyright>MoustafaMohsen©2019</Copyright>
     <Company>MoustafaMohsen</Company>
     <Authors>Moustafa Mohsen</Authors>
@@ -12,6 +21,7 @@
     <PackageIconUrl>https://github.com/MoustafaMohsen/CoreUserIdentity/blob/master/CoreUserIdentity/assets/license.txt</PackageIconUrl>
     <RepositoryUrl>https://github.com/MoustafaMohsen/CoreUserIdentity.git</RepositoryUrl>
     <PackageTags>Users Identity</PackageTags>
+    <PackageReleaseNotes>dependency updates, description added</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -29,7 +39,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="2.1.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="2.1.1" />
     <PackageReference Include="Microsoft.Extensions.Identity.Stores" Version="2.1.1" />
-    <PackageReference Include="MLiberary" Version="2.0.0" />
+    <PackageReference Include="MLibrary" Version="3.1.2" />
     <PackageReference Include="VerficationEmailSender" Version="2.0.0" />
   </ItemGroup>
 

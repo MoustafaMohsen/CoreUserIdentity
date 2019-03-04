@@ -2,7 +2,7 @@
 using CoreUserIdentity.Helpers;
 using CoreUserIdentity.Models;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
-using MLiberary;
+using MLibrary;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
